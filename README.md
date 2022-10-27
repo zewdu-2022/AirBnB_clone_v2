@@ -35,5 +35,8 @@ These are the files with the custom funtions and system calls, each one contains
 - Zewdu Asfaw
 
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 7c7d8e8c63072c01f8f319de45006f01fe728ab4
