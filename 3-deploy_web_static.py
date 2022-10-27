@@ -1,51 +1,89 @@
 #!/usr/bin/python3
-""" a module to packag web_static files and deploy """
-import datetime
-import os
-from fabric.api import put, env, run, local
+""" Full deployment """
+from fabric.api import *
+from datetime import datetime
+from os import path
+
+env.hosts = ['44.200.170.122', '54.237.2.122']
 
 
-env.hosts = ["35.231.213.145", "34.234.65.186"]
+@runs_once
+def do_pack():
+    """
+    Generates a .tgz archive from the contents
+    of the web_static folder
+    """
+    try:
+        today = datetime.now().strftime('%Y%m%d%H%M%S')
+        path = "versions/web_static_{:s}.tgz".format(today)
 
-env.user = "ubuntu"
+        msg1 = "Packing web_static to {:s}".format(path)
+        print(msg1)
+
+        with hide('running'):
+            local('mkdir -p ./versions')
+
+        local('tar -cvzf {:s} web_static'.format(path))
+
+        with hide('running'):
+            size = local('wc -c < {:s}'.format(path), capture=True)
+
+        msg2 = 'web_static packed: {:s} -> {:s}Bytes'.format(path, size)
+        print(msg2)
+
+        return path
+
+    except:
+        return None
 
 
 def do_deploy(archive_path):
-    """ deploy package """
-    if archive_path is None or not os.path.isfile(archive_path):
-        print("NOT PATH")
+    """
+    Distributes an archive to a web server
+    """
+    if not path.exists(archive_path):
         return False
 
-    aname = os.path.basename(archive_path)
-    rname = aname.split(".")[0]
+    path_nx = path.splitext(archive_path)[0]
+    path_nx = path_nx.split('/')[-1]
+    path_yx = path_nx + '.tgz'
 
-    put(local_path=archive_path, remote_path="/tmp/")
-    run("mkdir -p /data/web_static/releases/{}".format(rname))
-    run("tar -xzf /tmp/{} \
-        -C /data/web_static/releases/{}".format(aname, rname))
-    run("rm /tmp/{}".format(aname))
-    run("rm -rf /data/web_static/current")
-    run("ln -fs /data/web_static/releases/{}/ \
-        /data/web_static/current".format(rname))
-    run("mv /data/web_static/current/web_static/* /data/web_static/current/")
-    run("rm -rf /data/web_static/curren/web_static")
+    try:
+        put(archive_path, "/tmp/")
 
-    return True
+        run('mkdir -p /data/web_static/releases/{:s}/'.format(path_nx))
 
+        run('tar -xzf /tmp/{:s} -C /data/web_static/releases/{:s}/'.
+            format(path_yx, path_nx))
 
-def do_pack():
-    """ package function """
-    if not os.path.isdir("./versions"):
-        os.makedirs("./versions")
-    ntime = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    local("tar -czzf versions/web_static_{}.tgz web_static/*".format(ntime))
-    return ("{}/versions/web_static_{}.tgz".format(os.path.dirname(
-        os.path.abspath(__file__)), ntime))
+        run('rm /tmp/{:s}'.format(path_yx))
+
+        run('mv /data/web_static/releases/{:s}/web_static/*'
+            ' /data/web_static/releases/{:s}/'.
+            format(path_nx, path_nx))
+
+        run('rm -rf /data/web_static/releases/{:s}/web_static'.format(path_nx))
+
+        run('rm -rf /data/web_static/current')
+
+        run('ln -s /data/web_static/releases/{:s}/ /data/web_static/current'.
+            format(path_nx))
+
+        print("New version deployed!")
+        return True
+
+    except:
+        return False
 
 
 def deploy():
-    """ package && deploy to servers """
-    path = do_pack()
-    if path is None:
+    """
+    Creates and distributes an archive to web servers
+    """
+    archive_path = do_pack()
+
+    if not archive_path:
         return False
-    return(do_deploy(path))
+
+    return do_deploy(archive_path)
+
