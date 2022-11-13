@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-""" Full deployment """
+""" CleanUp """
 from fabric.api import *
 from datetime import datetime
 from os import path
@@ -87,3 +87,24 @@ def deploy():
 
     return do_deploy(archive_path)
 
+
+def do_clean(number=0):
+    """ Deletes out-of-date archives """
+
+    try:
+        number = int(number)
+    except:
+        return None
+
+    if number < 0:
+        return None
+
+    number = 2 if (number == 0 or number == 1) else (number + 1)
+
+    with lcd("./versions"):
+        local('ls -t | tail -n +{:d} | xargs rm -rf --'.
+              format(number))
+
+    with cd("/data/web_static/releases"):
+        run('ls -t | tail -n +{:d} | xargs rm -rf --'.
+            format(number))
